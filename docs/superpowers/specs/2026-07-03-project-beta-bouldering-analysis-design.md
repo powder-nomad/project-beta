@@ -16,24 +16,25 @@ This spec covers **Path A only**. The core analysis engine is designed to be har
 
 ## Scope (v1 / Path A)
 
-- Native iOS app (Swift). Cross-platform frameworks (React Native/Flutter) were evaluated and rejected for this use case: LiDAR is only exposed through raw ARKit APIs with no mature cross-platform plugin, so a native module would be required anyway with no cross-platform benefit gained. Android is a future port using the same pose model (MediaPipe), once Path A is validated.
+- **Native Android app (Kotlin + CameraX)**. Android-first because that's the hardware the initial builder/user actually has, and it fits Path A's "everyday hardware" framing well — no depth sensor is assumed or required. Native (not React Native/Flutter) because a native iOS app with ARKit LiDAR is already planned for later (see below), and cross-platform buys little when both platforms will eventually need platform-specific native work anyway.
+- iOS is a planned future port (native Swift), at which point it also picks up ARKit LiDAR support for the depth-fusion path described below. Order is: Android RGB-only now, iOS (RGB + LiDAR) later.
 - Fixed camera capture (tripod or propped phone at the base of the boulder problem) — camera does not move during the climb. This removes the need for camera-motion compensation.
 - On-device processing throughout (no backend/server needed for v1).
-- Pose estimation via MediaPipe (real-time on-device, ~30+ FPS on mid-range phones, validated in published studies against 3D motion capture for movement tracking).
-- Engine accepts an optional depth channel (from ARKit LiDAR scene depth, on supported devices) but must gracefully degrade to RGB-only pose estimation when depth is unavailable — this is the seam that lets the same engine serve Path B later.
+- Pose estimation via MediaPipe (real-time on-device, ~30+ FPS on mid-range phones, validated in published studies against 3D motion capture for movement tracking; same model/SDK used on both Android and the future iOS build, so this layer doesn't change between platforms).
+- Engine accepts an optional depth channel but must gracefully degrade to RGB-only pose estimation when depth is unavailable. On Android v1 this path is effectively always inactive (consumer Android devices don't have a meaningful equivalent to ARKit LiDAR), so v1 is RGB-only in practice — but the pipeline is still built with this seam so the future iOS+LiDAR build is additive, not a rewrite.
 - Pure movement analysis — no hold or route detection in v1. Metrics are derived entirely from the climber's body movement over time.
 - Post-climb batch report (not real-time overlay). The climber records a full attempt, then receives a report afterward. This gives headroom for model quality and iteration without fighting a real-time frame budget; real-time is a possible v2 feature once metrics are validated.
 
-Out of scope for v1 (explicitly deferred to Path B):
+Out of scope for v1 (explicitly deferred to Path B / later iOS port):
 - Hold/route detection (SAM-based segmentation, color/tape start detection, "holds touched" tracking).
 - Multi-camera setups.
 - Server-side course/session management.
 - Real-time on-screen feedback during recording.
-- Android app.
+- iOS app + LiDAR depth fusion (planned next, after Android v1 is validated).
 
 ## Architecture & Data Flow
 
-1. **Capture** — AVFoundation records RGB video. On LiDAR-capable devices, ARKit's scene depth API records a parallel depth stream. One take per climb attempt, fixed camera position.
+1. **Capture** — Android CameraX records RGB video. One take per climb attempt, fixed camera position. (Future iOS build: AVFoundation for RGB, plus ARKit's scene depth API for a parallel depth stream on LiDAR-capable devices.)
 2. **Calibration** (once per session) — before climbing, the climber taps a known reference (e.g. their own height, or a fixed hold spacing) on screen. Establishes pixel→real-world scale for that camera position. If skipped, the engine falls back to relative units (see Error Handling).
 3. **Pose estimation** — MediaPipe runs per-frame on the RGB video, producing joint landmarks (wrists, ankles, hips, shoulders, etc.) with confidence scores. Identical whether or not depth is present.
 4. **Depth fusion (optional)** — if a depth stream exists, 2D joint landmarks are projected into 3D using the depth map at each joint's pixel location. If absent, joints remain calibrated 2D pixel coordinates. This is the only stage that branches on hardware; everything downstream is hardware-unaware.
@@ -79,4 +80,4 @@ An instability score over time, combining:
 
 - Exact weighting formula for the crux "difficulty score" — needs validation against real, coach-labeled climbs.
 - Whether limb tremor should be added to the stability score in v1.1.
-- Android port timeline and MediaPipe parity testing.
+- iOS port timeline (adding ARKit LiDAR capture + depth fusion) and MediaPipe parity testing between Android and iOS.
