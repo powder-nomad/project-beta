@@ -28,7 +28,16 @@ class MediaPipePoseEstimator(private val context: Context) : PoseEstimator {
             .setMinPoseDetectionConfidence(MIN_POSE_DETECTION_CONFIDENCE)
             .build()
 
-        PoseLandmarker.createFromOptions(context, options).use { landmarker ->
+        val landmarkerInstance = try {
+            PoseLandmarker.createFromOptions(context, options)
+        } catch (e: Exception) {
+            throw IllegalStateException(
+                "Pose landmarker model not found. See app/src/main/assets/README.md for setup instructions.",
+                e
+            )
+        }
+
+        landmarkerInstance.use { landmarker ->
             val frames = mutableListOf<PoseFrame>()
             VideoFrameSource(File(videoFilePath)).forEachFrame { bitmap, timestampMs ->
                 val result = landmarker.detectForVideo(
@@ -75,7 +84,7 @@ private class VideoFrameSource(private val videoFile: File) {
 
             var timeUs = 0L
             while (timeUs <= durationUs) {
-                val bitmap = retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                val bitmap = retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST)
                 if (bitmap != null) {
                     try {
                         action(bitmap, timeUs / 1_000L)

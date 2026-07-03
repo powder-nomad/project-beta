@@ -21,4 +21,12 @@ class CalibrationCalculatorTest {
     fun `returns null when real-world reference is zero or negative`() {
         assertNull(CalibrationCalculator.computeScale(100.0, 0.0))
     }
+
+    @Test
+    fun `returns null when inputs are NaN or infinite`() {
+        assertNull(CalibrationCalculator.computeScale(Double.NaN, 1.7))
+        assertNull(CalibrationCalculator.computeScale(100.0, Double.NaN))
+        assertNull(CalibrationCalculator.computeScale(Double.POSITIVE_INFINITY, 1.7))
+        assertNull(CalibrationCalculator.computeScale(100.0, Double.POSITIVE_INFINITY))
+    }
 }

@@ -2,7 +2,6 @@ package com.projectbeta.engine
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
-import kotlin.math.sqrt
 
 class Point3DTest {
     @Test
