@@ -1,7 +1,5 @@
 package com.projectbeta.engine
 
-import kotlin.math.sqrt
-
 data class SpeedSample(val timestampMs: Long, val speedPerSecond: Double)
 data class StabilitySample(val timestampMs: Long, val instabilityScore: Double)
 
@@ -28,6 +26,10 @@ object MetricsEngine {
             if (i == 0) 0.0 else perpendicularMagnitude(points[i].centerOfMass - points[i - 1].centerOfMass, primaryDirection)
         }
 
+        // Extrapolate the pre-start velocity from the first real segment instead of a
+        // synthetic zero vector. A zero-vector placeholder would create a spurious jump
+        // from 0 to the first real velocity, showing up as fake acceleration/jerk at
+        // indices 1-2 even for a perfectly smooth constant-velocity climb.
         val velocities = points.indices.map { i ->
             if (i == 0) {
                 if (points.size > 1) points[1].centerOfMass - points[0].centerOfMass else Point3D(0.0, 0.0, 0.0)
