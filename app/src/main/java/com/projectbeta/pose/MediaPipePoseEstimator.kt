@@ -77,7 +77,14 @@ private class VideoFrameSource(private val videoFile: File) {
             while (timeUs <= durationUs) {
                 val bitmap = retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
                 if (bitmap != null) {
-                    action(bitmap, timeUs / 1_000L)
+                    try {
+                        action(bitmap, timeUs / 1_000L)
+                    } finally {
+                        // Each getFrameAtTime call allocates a full-resolution bitmap; a multi-minute
+                        // climb at ~30fps sampling would otherwise accumulate thousands of these,
+                        // relying on GC alone to reclaim native memory. Recycle eagerly per frame.
+                        bitmap.recycle()
+                    }
                 }
                 timeUs += frameIntervalUs
             }
