@@ -4,6 +4,8 @@ data class SpeedSample(val timestampMs: Long, val speedPerSecond: Double)
 data class StabilitySample(val timestampMs: Long, val instabilityScore: Double)
 
 object MetricsEngine {
+    data class CruxSegment(val startMs: Long, val endMs: Long, val difficultyScore: Double)
+
     fun computeSpeedCurve(trajectory: Trajectory): List<SpeedSample> {
         val points = trajectory.points
         if (points.size < 2) return emptyList()
@@ -69,5 +71,42 @@ object MetricsEngine {
         val max = values.maxOrNull() ?: 0.0
         if (max == 0.0) return values.map { 0.0 }
         return values.map { it / max }
+    }
+
+    // Difficulty formula is an unvalidated hypothesis (per spec) — needs tuning
+    // against coach-labeled climbs before the output can be trusted.
+    fun detectCrux(
+        speedCurve: List<SpeedSample>,
+        stabilityCurve: List<StabilitySample>,
+        segmentWindowMs: Long = 1000
+    ): CruxSegment? {
+        if (speedCurve.isEmpty() || stabilityCurve.isEmpty()) return null
+
+        val stabilityByTimestamp = stabilityCurve.associateBy { it.timestampMs }
+        val epsilon = 0.01
+        val difficultyByTimestamp = speedCurve.mapNotNull { speedSample ->
+            val stability = stabilityByTimestamp[speedSample.timestampMs] ?: return@mapNotNull null
+            speedSample.timestampMs to (1.0 / (speedSample.speedPerSecond + epsilon) + stability.instabilityScore)
+        }
+        if (difficultyByTimestamp.isEmpty()) return null
+
+        val sorted = difficultyByTimestamp.sortedBy { it.first }
+        var bestStart = sorted.first().first
+        var bestEnd = sorted.first().first
+        var bestAvg = Double.NEGATIVE_INFINITY
+
+        for (window in sorted.indices) {
+            val windowStart = sorted[window].first
+            val windowEnd = windowStart + segmentWindowMs
+            val inWindow = sorted.filter { it.first in windowStart..windowEnd }
+            val avg = inWindow.sumOf { it.second } / inWindow.size
+            if (avg > bestAvg) {
+                bestAvg = avg
+                bestStart = windowStart
+                bestEnd = inWindow.last().first
+            }
+        }
+
+        return CruxSegment(bestStart, bestEnd, bestAvg)
     }
 }
