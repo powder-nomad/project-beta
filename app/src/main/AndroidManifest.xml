@@ -4,7 +4,8 @@
 
     <application
         android:label="Project Beta"
-        android:allowBackup="false">
+        android:allowBackup="false"
+        android:theme="@style/Theme.ProjectBeta">
         <activity
             android:name=".capture.CaptureActivity"
             android:exported="true">
