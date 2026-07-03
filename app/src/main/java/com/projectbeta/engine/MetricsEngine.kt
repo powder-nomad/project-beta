@@ -28,22 +28,39 @@ object MetricsEngine {
             if (i == 0) 0.0 else perpendicularMagnitude(points[i].centerOfMass - points[i - 1].centerOfMass, primaryDirection)
         }
 
+        // TrajectoryBuilder drops low-confidence frames, so gaps between consecutive
+        // TrajectoryPoints are not guaranteed to be uniform. Normalize every derivative
+        // stage by elapsed time (matching computeSpeedCurve's dtSeconds pattern) so a
+        // longer gap after a dropped frame isn't misread as a sudden, unstable movement.
+        val dtSeconds = points.indices.map { i ->
+            if (i == 0) 0.0 else (points[i].timestampMs - points[i - 1].timestampMs) / 1000.0
+        }
+
         // Extrapolate the pre-start velocity from the first real segment instead of a
         // synthetic zero vector. A zero-vector placeholder would create a spurious jump
         // from 0 to the first real velocity, showing up as fake acceleration/jerk at
         // indices 1-2 even for a perfectly smooth constant-velocity climb.
-        val velocities = points.indices.map { i ->
+        val rawVelocities = (1 until points.size).map { i ->
+            val dt = dtSeconds[i]
+            if (dt > 0.0) (points[i].centerOfMass - points[i - 1].centerOfMass) / dt else Point3D(0.0, 0.0, 0.0)
+        }
+        val velocities = listOf(rawVelocities.first()) + rawVelocities
+
+        val accelerations = points.indices.map { i ->
             if (i == 0) {
-                if (points.size > 1) points[1].centerOfMass - points[0].centerOfMass else Point3D(0.0, 0.0, 0.0)
+                Point3D(0.0, 0.0, 0.0)
             } else {
-                points[i].centerOfMass - points[i - 1].centerOfMass
+                val dt = dtSeconds[i]
+                if (dt > 0.0) (velocities[i] - velocities[i - 1]) / dt else Point3D(0.0, 0.0, 0.0)
             }
         }
-        val accelerations = velocities.indices.map { i ->
-            if (i == 0) Point3D(0.0, 0.0, 0.0) else velocities[i] - velocities[i - 1]
-        }
-        val jerk = accelerations.indices.map { i ->
-            if (i == 0) 0.0 else accelerations[i].distanceTo(accelerations[i - 1])
+        val jerk = points.indices.map { i ->
+            if (i == 0) {
+                0.0
+            } else {
+                val dt = dtSeconds[i]
+                if (dt > 0.0) accelerations[i].distanceTo(accelerations[i - 1]) / dt else 0.0
+            }
         }
 
         val normalizedSway = normalize(sway)

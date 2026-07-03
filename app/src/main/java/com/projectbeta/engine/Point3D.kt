@@ -9,6 +9,9 @@ data class Point3D(val x: Double, val y: Double, val z: Double = 0.0) {
     operator fun plus(other: Point3D): Point3D =
         Point3D(x + other.x, y + other.y, z + other.z)
 
+    operator fun div(scalar: Double): Point3D =
+        Point3D(x / scalar, y / scalar, z / scalar)
+
     fun distanceTo(other: Point3D): Double {
         val dx = x - other.x
         val dy = y - other.y
