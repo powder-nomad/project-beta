@@ -28,8 +28,7 @@ class MediaPipePoseEstimator(private val context: Context) : PoseEstimator {
             .setMinPoseDetectionConfidence(MIN_POSE_DETECTION_CONFIDENCE)
             .build()
 
-        val landmarker = PoseLandmarker.createFromOptions(context, options)
-        try {
+        PoseLandmarker.createFromOptions(context, options).use { landmarker ->
             val frames = mutableListOf<PoseFrame>()
             VideoFrameSource(File(videoFilePath)).forEachFrame { bitmap, timestampMs ->
                 val result = landmarker.detectForVideo(
@@ -49,8 +48,6 @@ class MediaPipePoseEstimator(private val context: Context) : PoseEstimator {
                 frames.add(PoseFrame(timestampMs, joints))
             }
             return frames
-        } finally {
-            landmarker.close()
         }
     }
 }
