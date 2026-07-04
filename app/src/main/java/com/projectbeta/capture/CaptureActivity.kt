@@ -28,16 +28,21 @@ import androidx.camera.video.VideoCapture
 import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import com.projectbeta.data.ClimbRepository
 import com.projectbeta.engine.CalibrationCalculator
+import com.projectbeta.history.HistoryActivity
 import com.projectbeta.pipeline.AnalysisPipeline
 import com.projectbeta.pose.MediaPipePoseEstimator
-import kotlinx.coroutines.CoroutineScope
+import com.projectbeta.report.ReportActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 private const val TAG = "ProjectBeta"
 private const val RECORD_BUTTON_MARGIN_DP = 32
+private const val HISTORY_BUTTON_MARGIN_DP = 32
 
 /**
  * Fixed-camera capture screen: shows a CameraX preview, records a climb attempt to local
@@ -58,6 +63,7 @@ class CaptureActivity : AppCompatActivity() {
     private lateinit var rootLayout: FrameLayout
     private lateinit var previewView: PreviewView
     private lateinit var recordButton: Button
+    private lateinit var historyButton: Button
     private var calibrationOverlay: CalibrationOverlayView? = null
 
     private val cameraPermissionLauncher =
@@ -114,6 +120,20 @@ class CaptureActivity : AppCompatActivity() {
             bottomMargin = dpToPx(RECORD_BUTTON_MARGIN_DP)
         }
         rootLayout.addView(recordButton, buttonParams)
+
+        historyButton = Button(this).apply {
+            text = "History"
+            setOnClickListener { HistoryActivity.start(this@CaptureActivity) }
+        }
+        val historyButtonParams = FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.END
+            topMargin = dpToPx(HISTORY_BUTTON_MARGIN_DP)
+            rightMargin = dpToPx(HISTORY_BUTTON_MARGIN_DP)
+        }
+        rootLayout.addView(historyButton, historyButtonParams)
 
         setContentView(rootLayout)
     }
@@ -287,18 +307,36 @@ class CaptureActivity : AppCompatActivity() {
         analyzeRecording(outputFile.absolutePath)
     }
 
-    // --- Analysis (Phase 1: batch, log-only) ---------------------------------------------------
+    // --- Analysis -------------------------------------------------------------------------------
 
+    /**
+     * Runs the pipeline off the main thread, then persists the result and opens the Report
+     * screen. A pipeline failure (e.g. missing pose model, per MediaPipePoseEstimator) is shown
+     * as an error dialog and never reaches [ClimbRepository.save] — a failed analysis doesn't
+     * create a history entry.
+     */
     private fun analyzeRecording(videoFilePath: String) {
-        CoroutineScope(Dispatchers.Default).launch {
-            val pipeline = AnalysisPipeline(MediaPipePoseEstimator(applicationContext))
-            val report = pipeline.run(videoFilePath, calibrationScale)
-            // Phase 2 (separate plan) renders `report` as charts + skeleton-overlay
-            // video. For Phase 1, log it so the pipeline is verifiable end-to-end:
-            Log.i(
-                TAG,
-                "avgSpeed=${report.averageSpeed} peakSpeed=${report.peakSpeed} crux=${report.crux}"
-            )
+        lifecycleScope.launch {
+            val climbId = try {
+                val result = withContext(Dispatchers.Default) {
+                    val pipeline = AnalysisPipeline(MediaPipePoseEstimator(applicationContext))
+                    pipeline.run(videoFilePath, calibrationScale)
+                }
+                ClimbRepository(applicationContext).save(
+                    report = result.report,
+                    poseFrames = result.poseFrames,
+                    videoFilePath = videoFilePath
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Analysis failed", e)
+                AlertDialog.Builder(this@CaptureActivity)
+                    .setTitle("Analysis failed")
+                    .setMessage(e.message ?: "Unknown error analyzing the recording.")
+                    .setPositiveButton("OK", null)
+                    .show()
+                return@launch
+            }
+            ReportActivity.start(this@CaptureActivity, climbId)
         }
     }
 }

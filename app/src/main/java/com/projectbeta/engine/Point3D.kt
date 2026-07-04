@@ -1,7 +1,9 @@
 package com.projectbeta.engine
 
+import kotlinx.serialization.Serializable
 import kotlin.math.sqrt
 
+@Serializable
 data class Point3D(val x: Double, val y: Double, val z: Double = 0.0) {
     operator fun minus(other: Point3D): Point3D =
         Point3D(x - other.x, y - other.y, z - other.z)

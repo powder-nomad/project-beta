@@ -1,9 +1,14 @@
 package com.projectbeta.engine
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class SpeedSample(val timestampMs: Long, val speedPerSecond: Double)
+@Serializable
 data class StabilitySample(val timestampMs: Long, val instabilityScore: Double)
 
 object MetricsEngine {
+    @Serializable
     data class CruxSegment(val startMs: Long, val endMs: Long, val difficultyScore: Double)
 
     fun computeSpeedCurve(trajectory: Trajectory): List<SpeedSample> {

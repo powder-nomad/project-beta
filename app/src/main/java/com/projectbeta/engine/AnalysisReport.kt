@@ -1,5 +1,8 @@
 package com.projectbeta.engine
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class AnalysisReport(
     val trajectory: Trajectory,
     val speedCurve: List<SpeedSample>,

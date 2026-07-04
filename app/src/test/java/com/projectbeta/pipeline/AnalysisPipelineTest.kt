@@ -27,10 +27,11 @@ class AnalysisPipelineTest {
         }
         val pipeline = AnalysisPipeline(FakePoseEstimator(frames))
 
-        val report = pipeline.run("unused/path.mp4", scaleMetersPerUnit = null)
+        val result = pipeline.run("unused/path.mp4", scaleMetersPerUnit = null)
 
-        assertEquals(5, report.trajectory.points.size)
-        assertEquals(4, report.speedCurve.size)
-        assertNotNull(report.crux)
+        assertEquals(5, result.report.trajectory.points.size)
+        assertEquals(4, result.report.speedCurve.size)
+        assertNotNull(result.report.crux)
+        assertEquals(frames, result.poseFrames)
     }
 }
