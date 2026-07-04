@@ -7,7 +7,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.view.Gravity
+import android.util.Log
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -134,14 +134,21 @@ class ReportActivity : AppCompatActivity() {
 
     private fun loadClimb(climbId: Long) {
         lifecycleScope.launch {
-            val repository = ClimbRepository(applicationContext)
-            val record = repository.getById(climbId)
-            if (record == null) {
-                statsView.text = "Climb not found."
-                return@launch
+            try {
+                val repository = ClimbRepository(applicationContext)
+                val record = repository.getById(climbId)
+                if (record == null) {
+                    statsView.text = "Climb not found."
+                    return@launch
+                }
+                val payload = ClimbMapper.toReportPayload(record)
+                renderReport(record, payload)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("ReportActivity", "Failed to load climb $climbId", e)
+                statsView.text = "Couldn't load this report — its saved data may be corrupted."
             }
-            val payload = ClimbMapper.toReportPayload(record)
-            renderReport(record, payload)
         }
     }
 

@@ -3,6 +3,7 @@ package com.projectbeta.history
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -61,8 +62,16 @@ class HistoryActivity : AppCompatActivity() {
 
     private fun loadHistory() {
         lifecycleScope.launch {
-            val repository = ClimbRepository(applicationContext)
-            val cards = withContext(Dispatchers.IO) { loadCards(repository) }
+            val cards = try {
+                val repository = ClimbRepository(applicationContext)
+                withContext(Dispatchers.IO) { loadCards(repository) }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("HistoryActivity", "Failed to load climb history", e)
+                emptyStateView.text = "Couldn't load climb history."
+                emptyList()
+            }
 
             adapter.submitList(cards)
             recyclerView.visibility = if (cards.isEmpty()) android.view.View.GONE else android.view.View.VISIBLE
@@ -70,8 +79,19 @@ class HistoryActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Skips any record whose reportJson fails to decode (e.g. corrupted or from an
+     * incompatible future schema) rather than letting one bad row crash the whole list.
+     */
     private suspend fun loadCards(repository: ClimbRepository): List<ClimbCardData> =
-        repository.getAll().map { record -> toCardData(record) }
+        repository.getAll().mapNotNull { record ->
+            try {
+                toCardData(record)
+            } catch (e: Exception) {
+                Log.e("HistoryActivity", "Skipping unreadable climb record ${record.id}", e)
+                null
+            }
+        }
 
     private fun toCardData(record: ClimbRecord): ClimbCardData {
         val payload = ClimbMapper.toReportPayload(record)

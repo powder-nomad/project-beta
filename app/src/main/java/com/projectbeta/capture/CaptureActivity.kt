@@ -35,6 +35,7 @@ import com.projectbeta.history.HistoryActivity
 import com.projectbeta.pipeline.AnalysisPipeline
 import com.projectbeta.pose.MediaPipePoseEstimator
 import com.projectbeta.report.ReportActivity
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -327,13 +328,20 @@ class CaptureActivity : AppCompatActivity() {
                     poseFrames = result.poseFrames,
                     videoFilePath = videoFilePath
                 )
+            } catch (e: CancellationException) {
+                // The Activity was destroyed (e.g. user backed out) while analysis was still
+                // running — let structured concurrency propagate this, don't treat it as an
+                // analysis failure or touch a dead Activity's UI.
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "Analysis failed", e)
-                AlertDialog.Builder(this@CaptureActivity)
-                    .setTitle("Analysis failed")
-                    .setMessage(e.message ?: "Unknown error analyzing the recording.")
-                    .setPositiveButton("OK", null)
-                    .show()
+                if (!isFinishing && !isDestroyed) {
+                    AlertDialog.Builder(this@CaptureActivity)
+                        .setTitle("Analysis failed")
+                        .setMessage(e.message ?: "Unknown error analyzing the recording.")
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
                 return@launch
             }
             ReportActivity.start(this@CaptureActivity, climbId)
