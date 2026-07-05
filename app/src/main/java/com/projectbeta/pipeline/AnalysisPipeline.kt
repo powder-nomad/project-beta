@@ -12,6 +12,12 @@ data class PipelineResult(val report: AnalysisReport, val poseFrames: List<PoseF
 class AnalysisPipeline(private val poseEstimator: PoseEstimator) {
     fun run(videoFilePath: String, scaleMetersPerUnit: Double?): PipelineResult {
         val frames = poseEstimator.estimate(videoFilePath)
+        if (frames.isEmpty()) {
+            throw IllegalStateException(
+                "No frames could be decoded from this video. It may use a codec or " +
+                    "resolution unsupported by this device (e.g. 4K/HDR video)."
+            )
+        }
         val trajectory = TrajectoryBuilder.build(frames, scaleMetersPerUnit)
         val report = MetricsEngine.buildReport(trajectory)
         return PipelineResult(report, frames)

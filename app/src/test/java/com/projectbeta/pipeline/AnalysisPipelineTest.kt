@@ -7,6 +7,7 @@ import com.projectbeta.engine.PoseFrame
 import com.projectbeta.pose.PoseEstimator
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 
 class FakePoseEstimator(private val frames: List<PoseFrame>) : PoseEstimator {
@@ -33,5 +34,17 @@ class AnalysisPipelineTest {
         assertEquals(4, result.report.speedCurve.size)
         assertNotNull(result.report.crux)
         assertEquals(frames, result.poseFrames)
+    }
+
+    @Test
+    fun `throws when the pose estimator extracts no frames`() {
+        // A decoder that can't handle the video's codec/resolution (e.g. 4K HDR HEVC on an
+        // unsupported device) returns null for every frame instead of throwing, so an empty
+        // frame list is the only signal available that decoding silently failed.
+        val pipeline = AnalysisPipeline(FakePoseEstimator(emptyList()))
+
+        assertThrows(IllegalStateException::class.java) {
+            pipeline.run("unused/path.mp4", scaleMetersPerUnit = null)
+        }
     }
 }
