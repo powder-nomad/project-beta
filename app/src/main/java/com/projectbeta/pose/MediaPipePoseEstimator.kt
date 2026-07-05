@@ -40,10 +40,20 @@ class MediaPipePoseEstimator(private val context: Context) : PoseEstimator {
         landmarkerInstance.use { landmarker ->
             val frames = mutableListOf<PoseFrame>()
             VideoFrameSource(File(videoFilePath)).forEachFrame { bitmap, timestampMs ->
+                // getFrameAtTime's bitmap config depends on the device's decoder (e.g. RGB_565
+                // on some hardware); MediaPipe's BitmapImageBuilder requires ARGB_8888.
+                val argbBitmap = if (bitmap.config == Bitmap.Config.ARGB_8888) {
+                    bitmap
+                } else {
+                    bitmap.copy(Bitmap.Config.ARGB_8888, false)
+                }
                 val result = landmarker.detectForVideo(
-                    BitmapImageBuilder(bitmap).build(),
+                    BitmapImageBuilder(argbBitmap).build(),
                     timestampMs
                 )
+                if (argbBitmap !== bitmap) {
+                    argbBitmap.recycle()
+                }
                 val landmarks = result.landmarks().firstOrNull() ?: return@forEachFrame
                 val joints = landmarks.mapIndexedNotNull { index, landmark ->
                     val joint = MediaPipeJointMapping.toJoint(index) ?: return@mapIndexedNotNull null
