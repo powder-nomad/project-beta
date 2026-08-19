@@ -96,7 +96,7 @@ app/src/main/assets/pose_landmarker_full.task
 
 ```
 project-beta/
-├── index.md                      # 이 문서
+├── README.md                     # 이 문서
 ├── settings.gradle.kts           # 루트 Gradle 설정 (:app 단일 모듈)
 ├── gradle.properties
 ├── gradlew / gradlew.bat
